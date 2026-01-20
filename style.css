@@ -183,6 +183,15 @@ html, body{
   pointer-events: none;
 }
 
+#face{
+  position: absolute;
+  font-size: 20px;
+  transform: translate(-50%, -120%);
+  text-shadow: 0 8px 18px rgba(0,0,0,0.35);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 #new-chat{
   position: absolute;
   right: 16px;
