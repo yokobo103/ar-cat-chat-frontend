@@ -1,0 +1,212 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: -apple-system, system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
+
+body {
+  position: relative;
+}
+
+
+#cam, #gl{
+  position: absolute;
+  left: 0; top: 0;
+  width: 100vw;
+  height: var(--vvh);
+  object-fit: cover; /* videoに重要 */
+}
+
+
+#gl { pointer-events: none; } /* UIの操作を邪魔しない */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  height: var(--vvh);
+  pointer-events: none;
+}
+
+
+#hint {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+}
+
+#bubble {
+  position: absolute;
+  width: fit-content;
+  max-width: min(340px, 82vw);
+  max-height: min(40vh, 320px);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.92);
+  color: #111;
+  font-size: 14px;
+  line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+#bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  background: rgba(255,255,255,0.92);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 2px;
+}
+
+.hidden { display: none; }
+
+
+#bubble[data-mood="neutral"] { background: rgba(255,255,255,0.92); }
+#bubble[data-mood="happy"]   { background: rgba(255, 255, 200, 0.95); }
+#bubble[data-mood="angry"]   { background: rgba(255, 210, 210, 0.95); }
+#bubble[data-mood="sad"]     { background: rgba(210, 230, 255, 0.95); }
+#bubble[data-mood="surprised"] { background: rgba(235, 220, 255, 0.95); }
+
+
+:root{
+  --vvh: 100vh;     /* JSで上書きされる */
+  --panelH: calc(var(--vvh) * 0.34);   /* 好みで調整。まずは34% */
+  --kbd: 0px;
+}
+
+html, body{
+  height: var(--vvh);
+}
+#cam, #gl{
+  height: var(--vvh);
+}
+
+/* ここが大事：panelは bottom固定 */
+/* stage は panel を除いた高さ */
+#stage{
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: calc(var(--vvh) - var(--panelH));
+}
+
+#panel{
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--panelH);
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255,255,255,0.12);
+  pointer-events: auto;
+}
+
+#log{
+  flex: 1;
+  overflow: auto;
+  overflow-x: hidden;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.msg{
+  margin: 6px 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.badge{
+  font-size: 12px;
+  opacity: 0.75;
+  min-width: 2.8em;
+}
+.text{
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+#chatbar{
+  display: flex;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+
+#q{
+  flex: 1;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 16px;
+}
+
+#send{
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 16px;
+}
+
+/* 吹き出しは上ステージ内に表示される想定 */
+#bubble{ pointer-events: none; }
+
+/* 感情エフェクト（絵文字） */
+#fx{
+  position: absolute;
+  font-size: 28px;
+  transform: translate(-50%, -120%);
+  text-shadow: 0 8px 18px rgba(0,0,0,0.35);
+  pointer-events: none;
+}
+
+#new-chat{
+  position: absolute;
+  right: 16px;
+  bottom: calc(var(--panelH) + 16px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.25);
+  pointer-events: auto;
+}
+
+#new-chat .paw{
+  font-size: 16px;
+  line-height: 1;
+}
+
+#new-chat:active{
+  transform: translateY(1px);
+}

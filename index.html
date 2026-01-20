@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=overlays-content">
+  <title>Yokobo AR Chat Cat (Pseudo AR)</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- カメラ -->
+  <video id="cam" autoplay playsinline muted></video>
+
+  <!-- Three.js -->
+  <canvas id="gl"></canvas>
+
+  <!-- UI -->
+  <div id="hud">
+    <div id="chatbar">
+      <input id="q" type="text" placeholder="猫に質問してみて…" autocomplete="off" />
+      <button id="send">送信</button>
+    </div>
+
+    <div id="stage">
+      <div id="bubble" class="hidden"></div>
+      <div id="fx" class="hidden"></div>
+      <button id="new-chat" type="button">
+        <span class="paw" aria-hidden="true">🐾</span>
+        <span class="label">New</span>
+      </button>
+    </div>
+
+    <div id="panel">
+      <div id="log"></div>
+    </div>
+  </div>
+
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/examples/jsm/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
