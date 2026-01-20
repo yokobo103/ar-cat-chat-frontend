@@ -26,6 +26,7 @@ const bubble = document.getElementById("bubble");
 const input = document.getElementById("q");
 const sendBtn = document.getElementById("send");
 const newChatBtn = document.getElementById("new-chat");
+const faceEl = document.getElementById("face");
 const BASE = { w: window.innerWidth, h: window.innerHeight };
 
 function isKeyboardActive() {
@@ -45,11 +46,17 @@ input.addEventListener("focus", () => {
   document.body.classList.add("kbd");
   document.documentElement.style.setProperty("--vvh", `${BASE.h}px`);
   updateKeyboardOffset();
+  if (!["thinking", "speaking", "clarify"].includes(conversationState)) {
+    setConversationState("listening");
+  }
 });
 input.addEventListener("blur", () => {
   document.body.classList.remove("kbd");
   updateVVH(true);
   updateKeyboardOffset();
+  if (conversationState === "listening") {
+    setConversationState("idle");
+  }
 });
 
 async function startCamera() {
@@ -62,6 +69,150 @@ async function startCamera() {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+const MAX_HISTORY_PAIRS = 5;
+const MAX_BUBBLE_CHARS = 110;
+
+let conversationState = "idle"; // idle | listening | thinking | speaking | clarify
+let speakingUntil = 0;
+let clarifyUntil = 0;
+let leanUntil = 0;
+let leanDuration = 0;
+let stateFxEmoji = "";
+let isSending = false;
+const conversationHistory = [];
+
+function getDefaultState() {
+  return isKeyboardActive() ? "listening" : "idle";
+}
+
+function setConversationState(next) {
+  conversationState = next;
+  updateStateFx();
+}
+
+function updateStateFx() {
+  if (conversationState === "thinking") {
+    stateFxEmoji = "…";
+  } else if (conversationState === "clarify") {
+    stateFxEmoji = "？";
+  } else {
+    stateFxEmoji = "";
+  }
+  renderStateFx();
+}
+
+function renderStateFx() {
+  if (fxEl.dataset.mode === "burst") return;
+  if (!stateFxEmoji) {
+    fxEl.classList.add("hidden");
+    fxEl.dataset.mode = "";
+    return;
+  }
+  fxEl.textContent = stateFxEmoji;
+  fxEl.classList.remove("hidden");
+  fxEl.dataset.mode = "state";
+}
+
+function showFx(emoji, ms = 900) {
+  fxEl.textContent = emoji;
+  fxEl.classList.remove("hidden");
+  fxEl.dataset.mode = "burst";
+  const until = performance.now() + ms;
+  const tick = () => {
+    if (performance.now() > until) {
+      fxEl.classList.add("hidden");
+      fxEl.dataset.mode = "";
+      renderStateFx();
+      return;
+    }
+    requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function showFace(emoji, ms = 900) {
+  faceEl.textContent = emoji;
+  faceEl.classList.remove("hidden");
+  const until = performance.now() + ms;
+  const tick = () => {
+    if (performance.now() > until) { faceEl.classList.add("hidden"); return; }
+    requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function setSpeakingWindow(ms) {
+  const now = performance.now();
+  speakingUntil = now + ms;
+  if (conversationState !== "clarify") {
+    setConversationState("speaking");
+  }
+}
+
+function setClarifyWindow(ms) {
+  const now = performance.now();
+  clarifyUntil = now + ms;
+  setConversationState("clarify");
+}
+
+function updateConversationState() {
+  const now = performance.now();
+  if (conversationState === "thinking") return;
+
+  if (conversationState === "clarify" && now > clarifyUntil) {
+    if (now < speakingUntil) {
+      setConversationState("speaking");
+    } else {
+      setConversationState(getDefaultState());
+    }
+    return;
+  }
+
+  if (conversationState === "speaking" && now > speakingUntil) {
+    setConversationState(getDefaultState());
+  }
+
+  if (conversationState === "listening" && !isKeyboardActive()) {
+    setConversationState("idle");
+  }
+}
+
+function formatBubbleText(text) {
+  if (text.length <= MAX_BUBBLE_CHARS) return text;
+  return `${text.slice(0, MAX_BUBBLE_CHARS)}…\n（続きは下へ）`;
+}
+
+function pushHistory(role, text) {
+  conversationHistory.push({ role, text });
+  const maxEntries = MAX_HISTORY_PAIRS * 2;
+  if (conversationHistory.length > maxEntries) {
+    conversationHistory.splice(0, conversationHistory.length - maxEntries);
+  }
+}
+
+function buildMessageWithHistory(current) {
+  if (conversationHistory.length === 0) {
+    return `今回:\nユーザー: ${current}`;
+  }
+  const historyLines = conversationHistory.map((entry) => {
+    const label = entry.role === "user" ? "ユーザー" : "猫";
+    return `${label}: ${entry.text}`;
+  });
+  return `これまでの会話:\n${historyLines.join("\n")}\n\n今回:\nユーザー: ${current}`;
+}
+
+function detectClarify(text) {
+  const t = text.toLowerCase();
+  return t.includes("もう少し")
+    || t.includes("詳しく")
+    || t.includes("どんな")
+    || t.includes("どの")
+    || t.includes("どれ")
+    || t.includes("何")
+    || t.includes("?")
+    || t.includes("？");
+}
 
 // ===== Three.js =====
 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
@@ -138,23 +289,10 @@ function addLog(role, text){
 }
 
 function setBubble(text){
-  bubble.textContent = text;
+  bubble.textContent = formatBubbleText(text);
   bubble.classList.remove("hidden");
   updateBubblePosition();
 }
-
-function showFx(emoji, ms=900){
-  fxEl.textContent = emoji;
-  fxEl.classList.remove("hidden");
-  const until = performance.now() + ms;
-  const tick = () => {
-    if (performance.now() > until) { fxEl.classList.add("hidden"); return; }
-    requestAnimationFrame(tick);
-  };
-  tick();
-}
-
-
 
 function updateBubblePosition() {
   if (!cat) return;
@@ -178,6 +316,15 @@ function updateBubblePosition() {
     const y2 = (-p2.y * 0.5 + 0.5) * BASE.h;
     fxEl.style.left = `${x2}px`;
     fxEl.style.top  = `${y2}px`;
+  }
+
+  if (!faceEl.classList.contains("hidden")) {
+    const p3 = cat.position.clone(); p3.y += 0.54;
+    p3.project(camera);
+    const x3 = (p3.x * 0.5 + 0.5) * BASE.w;
+    const y3 = (-p3.y * 0.5 + 0.5) * BASE.h;
+    faceEl.style.left = `${x3}px`;
+    faceEl.style.top  = `${y3}px`;
   }
 }
 
@@ -212,9 +359,9 @@ function animateCat(time) {
   }
 
   // ベース（待機）
-    const baseY    = catAnchor.y + Math.sin(t * 1.6) * 0.006; // 呼吸レベル
-    const baseRotY = Math.sin(t * 0.4) * 0.04;               // わずかに揺れる
-    const baseRotX = Math.sin(t * 0.7) * 0.015;              // 首の動き
+  const baseY    = catAnchor.y + Math.sin(t * 1.6) * 0.006; // 呼吸レベル
+  const baseRotY = Math.sin(t * 0.4) * 0.04;               // わずかに揺れる
+  const baseRotX = Math.sin(t * 0.7) * 0.015;              // 首の動き
 
 
   // デフォルト
@@ -231,6 +378,25 @@ function animateCat(time) {
     const jump = Math.sin(u * Math.PI) * 0.06;
     y += jump;
     scale *= 1.08;
+  }
+
+  // 会話状態のモーション
+  if (conversationState === "listening") {
+    ry += Math.sin(t * 1.6) * 0.08;
+    rx += 0.06 + Math.sin(t * 2.2) * 0.02;
+  } else if (conversationState === "thinking") {
+    ry += Math.sin(t * 0.9) * 0.16;
+    rx += Math.sin(t * 1.2) * 0.03;
+  } else if (conversationState === "speaking") {
+    ry += Math.sin(t * 1.4) * 0.06;
+  } else if (conversationState === "clarify") {
+    ry += 0.18 + Math.sin(t * 1.1) * 0.05;
+    rx += -0.04;
+  }
+
+  if (leanUntil > now) {
+    const u = 1 - (leanUntil - now) / leanDuration;
+    rx += Math.sin(u * Math.PI) * 0.12;
   }
 
   // 感情ごとの上書き
@@ -317,12 +483,16 @@ function detectMoodFromText(text) {
 
 
 async function onSend(){
+  if (isSending) return;
   const q = input.value.trim();
   if(!q) return;
   input.value = "";
+  isSending = true;
 
   addLog("user", q);
+  pushHistory("user", q);
 
+  setConversationState("thinking");
   setBubble("…考え中");
   setMood("neutral", 800);
 
@@ -333,7 +503,8 @@ async function onSend(){
   let m = "neutral";
 
   try {
-    const data = await callLLM(q); // { answer, mood }
+    const message = buildMessageWithHistory(q);
+    const data = await callLLM(message); // { answer, mood }
     answer = (data?.answer || "").trim() || "（うまく返せなかった…）";
     m = data?.mood || detectMoodFromText(answer);
   } catch (e) {
@@ -343,6 +514,7 @@ async function onSend(){
   }
 
   addLog("cat", answer);
+  pushHistory("cat", answer);
 
   setMood(m, 2200);
 
@@ -352,7 +524,25 @@ async function onSend(){
   if (m === "surprised") showFx("❗️", 700);
 
   setBubble(answer);
+  showFace("😺", 900);
+
+  if (answer.length > 80) {
+    leanDuration = 900;
+    leanUntil = performance.now() + leanDuration;
+  }
+  if (answer.includes("!") || answer.includes("！")) {
+    pop(260);
+  }
+
+  const isClarify = detectClarify(answer);
+  const speakingDuration = Math.min(4200, 1800 + answer.length * 18);
+  setSpeakingWindow(speakingDuration);
+  if (isClarify) {
+    setClarifyWindow(1400);
+  }
+
   await nodOnce();
+  isSending = false;
 }
 
 
@@ -361,8 +551,10 @@ async function onSend(){
 sendBtn.addEventListener("click", onSend);
 newChatBtn.addEventListener("click", () => {
   logEl.innerHTML = "";
+  conversationHistory.length = 0;
   setMood("neutral", 800);
   setBubble("新しいチャットを始めよう。");
+  setConversationState(getDefaultState());
 });
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") onSend();
@@ -371,6 +563,7 @@ input.addEventListener("keydown", (e) => {
 // render loop
 function loop(time) {
   requestAnimationFrame(loop);
+  updateConversationState();
   animateCat(time);
   updateBubblePosition();
   renderer.render(scene, camera);
