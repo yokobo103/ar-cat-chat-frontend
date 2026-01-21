@@ -34,6 +34,14 @@ function isKeyboardActive() {
   return document.body.classList.contains("kbd") || document.activeElement === input;
 }
 
+function isKeyboardOpen() {
+  if (!document.body.classList.contains("kbd")) return false;
+  if (!window.visualViewport) return true;
+  const vv = window.visualViewport;
+  const shrink = BASE.h - vv.height - vv.offsetTop;
+  return shrink > 80;
+}
+
 function isKeyboardResize(w, h) {
   const looksLikeKeyboard = (w === BASE.w) && (h < BASE.h);
   const hasViewportShrink = window.visualViewport
@@ -147,7 +155,7 @@ function getCatScreenPosition(yOffset) {
 
 function showFlowers() {
   if (!flowerLayer || !cat) return;
-  if (isKeyboardActive()) return;
+  if (isKeyboardOpen()) return;
 
   const anchor = getCatScreenPosition(0.56);
   if (!anchor) return;
@@ -179,6 +187,26 @@ function showFlowers() {
     flowerLayer.classList.add("hidden");
     flowerLayer.textContent = "";
   }, 1900);
+}
+
+function showFlowersWhenReady({ maxWait = 1400 } = {}) {
+  const start = performance.now();
+
+  const attempt = () => {
+    if (!flowerLayer || !cat) return;
+    if (isKeyboardOpen()) {
+      if (document.activeElement === input) {
+        input.blur();
+      }
+      if (performance.now() - start < maxWait) {
+        window.setTimeout(attempt, 120);
+      }
+      return;
+    }
+    showFlowers();
+  };
+
+  attempt();
 }
 
 function showFace(emoji, ms = 900) {
@@ -544,7 +572,12 @@ async function onSend(){
   const q = input.value.trim();
   if(!q) return;
   const userPositive = isPositiveUserMessage(q);
+  const isTouchDevice = window.matchMedia("(pointer: coarse)").matches
+    || navigator.maxTouchPoints > 0;
   input.value = "";
+  if (isTouchDevice && document.activeElement === input) {
+    input.blur();
+  }
   isSending = true;
 
   addLog("user", q);
@@ -584,7 +617,7 @@ async function onSend(){
   if (m === "angry") showFx("💢", 900);
   if (m === "sad") showFx("💧", 900);
   if (m === "surprised") showFx("❗️", 700);
-  if (shouldShowFlowers(answer, m, userPositive)) showFlowers();
+  if (shouldShowFlowers(answer, m, userPositive)) showFlowersWhenReady();
 
   setBubble(answer);
   showFace("😺", 900);
