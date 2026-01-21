@@ -27,6 +27,7 @@ const input = document.getElementById("q");
 const sendBtn = document.getElementById("send");
 const newChatBtn = document.getElementById("new-chat");
 const faceEl = document.getElementById("face");
+const flowerLayer = document.getElementById("flowers");
 const BASE = { w: window.innerWidth, h: window.innerHeight };
 
 function isKeyboardActive() {
@@ -129,6 +130,55 @@ function showFx(emoji, ms = 900) {
     requestAnimationFrame(tick);
   };
   tick();
+}
+
+const FLOWER_EMOJIS = ["🌸", "🌼", "❀", "🌺"];
+
+function getCatScreenPosition(yOffset) {
+  if (!cat) return null;
+  const p = cat.position.clone();
+  p.y += yOffset;
+  p.project(camera);
+  return {
+    x: (p.x * 0.5 + 0.5) * BASE.w,
+    y: (-p.y * 0.5 + 0.5) * BASE.h
+  };
+}
+
+function showFlowers() {
+  if (!flowerLayer || !cat) return;
+  if (isKeyboardActive()) return;
+
+  const anchor = getCatScreenPosition(0.56);
+  if (!anchor) return;
+
+  const count = 3 + Math.floor(Math.random() * 4);
+  flowerLayer.classList.remove("hidden");
+
+  for (let i = 0; i < count; i += 1) {
+    const flower = document.createElement("span");
+    const size = 14 + Math.floor(Math.random() * 9);
+    const duration = 1.2 + Math.random() * 0.6;
+    const dx = (Math.random() - 0.5) * 36;
+    const dy = -16 - Math.random() * 22;
+    const offsetX = (Math.random() - 0.5) * 24;
+    const offsetY = (Math.random() - 0.5) * 18;
+
+    flower.className = "flower";
+    flower.textContent = FLOWER_EMOJIS[i % FLOWER_EMOJIS.length];
+    flower.style.left = `${anchor.x + offsetX}px`;
+    flower.style.top = `${anchor.y + offsetY}px`;
+    flower.style.setProperty("--size", `${size}px`);
+    flower.style.setProperty("--dur", `${duration.toFixed(2)}s`);
+    flower.style.setProperty("--dx", `${dx.toFixed(1)}px`);
+    flower.style.setProperty("--dy", `${dy.toFixed(1)}px`);
+    flowerLayer.appendChild(flower);
+  }
+
+  window.setTimeout(() => {
+    flowerLayer.classList.add("hidden");
+    flowerLayer.textContent = "";
+  }, 1900);
 }
 
 function showFace(emoji, ms = 900) {
@@ -300,31 +350,28 @@ function updateBubblePosition() {
 
   // 吹き出し
   if (!bubble.classList.contains("hidden")) {
-    const p = cat.position.clone(); p.y += 0.45;
-    p.project(camera);
-    const x = (p.x * 0.5 + 0.5) * BASE.w;
-    const y = (-p.y * 0.5 + 0.5) * BASE.h;
-    bubble.style.left = `${x+40}px`;
-    bubble.style.top  = `${y}px`;
+    const pos = getCatScreenPosition(0.45);
+    if (pos) {
+      bubble.style.left = `${pos.x + 40}px`;
+      bubble.style.top = `${pos.y}px`;
+    }
   }
 
   // エフェクト（少し上）
   if (!fxEl.classList.contains("hidden")) {
-    const p2 = cat.position.clone(); p2.y += 0.62;
-    p2.project(camera);
-    const x2 = (p2.x * 0.5 + 0.5) * BASE.w;
-    const y2 = (-p2.y * 0.5 + 0.5) * BASE.h;
-    fxEl.style.left = `${x2}px`;
-    fxEl.style.top  = `${y2}px`;
+    const pos = getCatScreenPosition(0.62);
+    if (pos) {
+      fxEl.style.left = `${pos.x}px`;
+      fxEl.style.top = `${pos.y}px`;
+    }
   }
 
   if (!faceEl.classList.contains("hidden")) {
-    const p3 = cat.position.clone(); p3.y += 0.54;
-    p3.project(camera);
-    const x3 = (p3.x * 0.5 + 0.5) * BASE.w;
-    const y3 = (-p3.y * 0.5 + 0.5) * BASE.h;
-    faceEl.style.left = `${x3}px`;
-    faceEl.style.top  = `${y3}px`;
+    const pos = getCatScreenPosition(0.54);
+    if (pos) {
+      faceEl.style.left = `${pos.x}px`;
+      faceEl.style.top = `${pos.y}px`;
+    }
   }
 }
 
@@ -481,6 +528,10 @@ function detectMoodFromText(text) {
   return "neutral";
 }
 
+function shouldShowFlowers(answer, currentMood) {
+  if (!answer) return currentMood === "happy";
+  return /ありがとう|助かる|嬉しい|どういたしまして/.test(answer) || currentMood === "happy";
+}
 
 async function onSend(){
   if (isSending) return;
@@ -522,6 +573,7 @@ async function onSend(){
   if (m === "angry") showFx("💢", 900);
   if (m === "sad") showFx("💧", 900);
   if (m === "surprised") showFx("❗️", 700);
+  if (shouldShowFlowers(answer, m)) showFlowers();
 
   setBubble(answer);
   showFace("😺", 900);
@@ -559,6 +611,8 @@ newChatBtn.addEventListener("click", () => {
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") onSend();
 });
+
+window.__debugFlowers = () => showFlowers();
 
 // render loop
 function loop(time) {
