@@ -528,7 +528,13 @@ function detectMoodFromText(text) {
   return "neutral";
 }
 
-function shouldShowFlowers(answer, currentMood) {
+function isPositiveUserMessage(text) {
+  if (!text) return false;
+  return /ありがとう|助かる|かわいい|可愛い|すごい|最高|大好き|嬉しい/.test(text);
+}
+
+function shouldShowFlowers(answer, currentMood, userPositive) {
+  if (userPositive) return true;
   if (!answer) return currentMood === "happy";
   return /ありがとう|助かる|嬉しい|どういたしまして/.test(answer) || currentMood === "happy";
 }
@@ -537,6 +543,7 @@ async function onSend(){
   if (isSending) return;
   const q = input.value.trim();
   if(!q) return;
+  const userPositive = isPositiveUserMessage(q);
   input.value = "";
   isSending = true;
 
@@ -564,6 +571,10 @@ async function onSend(){
     m = "sad";
   }
 
+  if (userPositive) {
+    m = "happy";
+  }
+
   addLog("cat", answer);
   pushHistory("cat", answer);
 
@@ -573,7 +584,7 @@ async function onSend(){
   if (m === "angry") showFx("💢", 900);
   if (m === "sad") showFx("💧", 900);
   if (m === "surprised") showFx("❗️", 700);
-  if (shouldShowFlowers(answer, m)) showFlowers();
+  if (shouldShowFlowers(answer, m, userPositive)) showFlowers();
 
   setBubble(answer);
   showFace("😺", 900);
